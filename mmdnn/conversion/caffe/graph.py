@@ -250,8 +250,8 @@ class CaffeGraph(object):
     def compute_output_shapes(self, model):
         sorted_nodes = self.topologically_sorted()
         (tmp_handle, tmp_prototxt) = tempfile.mkstemp(suffix=".prototxt")
-        with open(tmp_prototxt, 'w') as f:
-            f.write(text_format.MessageToString(model))
+        os.write(tmp_handle, str.encode(text_format.MessageToString(model)))
+        os.close(tmp_handle)
         self.prototxt = tmp_prototxt
         if has_pycaffe():
             caffe = get_caffe_resolver().caffe
@@ -267,8 +267,6 @@ class CaffeGraph(object):
             for node in sorted_nodes:
                 if node.output_shape is None:
                     node.output_shape = TensorShape(*NodeKind.compute_output_shape(node))
-            os.close(tmp_handle)
-            os.remove(tmp_prototxt)
         else:
             for node in sorted_nodes:
                 node.output_shape = TensorShape(*NodeKind.compute_output_shape(node))
