@@ -115,7 +115,7 @@ def KitModel(weight_file = None):
             "model",
             ', '.join([self.IR_graph.get_node(name).real_variable_name for name in self.IR_graph.input_layers if self.IR_graph.get_node(name).type != 'Const']),
             ', '.join([self.IR_graph.get_node(name).real_variable_name for name in self.IR_graph.output_layers if self.IR_graph.get_node(name).type != 'Pack'])))
-        self.add_body(1, ["set_layer_weights(model, weights_dict)", "return model"])
+        self.add_body(1, ["if weights_dict is not None: set_layer_weights(model, weights_dict)", "return model"])
 
         for i in self.used_layers:
             func = getattr(self, "_layer_" + i)
@@ -213,7 +213,7 @@ def KitModel(weight_file = None):
             dilations = [1] * len(IR_node.get_attr('kernel_shape'))
 
 
-        self.add_body(1, "{:<15} = convolution(weights_dict, name='{}', input={}, group={}, conv_type='{}', {}, kernel_size={}, strides={}, dilation_rate={}, padding='{}', use_bias={})".format(
+        self.add_body(1, "{:<15} = convolution(weights_dict, name='{}', input={}, group={}, conv_type='{}', {}, kernel_size={}, strides={}, dilation_rate={}, padding='{}', use_bias={}, kernel_initializer={})".format(
             IR_node.variable_name,
             IR_node.name,
             input_node,
@@ -224,7 +224,9 @@ def KitModel(weight_file = None):
             tuple(IR_node.get_attr('strides')[1:-1]),
             tuple(dilations[1:-1]),
             padding,
-            IR_node.get_attr('use_bias')))
+            IR_node.get_attr('use_bias'),
+            #fast fix to be more like weight_filler xavier in Caffe
+            "keras.initializers.VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform')"))
 
 
     def emit_ConvTranspose(self, IR_node):
@@ -273,11 +275,13 @@ def KitModel(weight_file = None):
 
 
     def emit_FullyConnected(self, IR_node):
-        self.add_body(1, "{:<15} = layers.Dense(name = '{}', units = {}, use_bias = {})({})".format(
+        self.add_body(1, "{:<15} = layers.Dense(name = '{}', units = {}, use_bias = {}, kernel_initializer={})({})".format(
             IR_node.variable_name,
             IR_node.name,
             IR_node.get_attr('units'),
             IR_node.get_attr('use_bias'),
+            #fast fix to be more like weight_filler xavier in Caffe
+            "keras.initializers.VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform')",
             self.parent_variable_name(IR_node)))
 
 
